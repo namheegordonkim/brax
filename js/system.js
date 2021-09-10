@@ -2,11 +2,12 @@ import * as THREE from 'https://threejs.org/build/three.module.js';
 
 const basicMaterial = new THREE.MeshPhongMaterial({color: 0x665544});
 const targetMaterial = new THREE.MeshPhongMaterial({color: 0xff2222});
-const gridTexture = new THREE.TextureLoader().load("./assets/grid.png");
-const gridMaterial = new THREE.MeshPhongMaterial({ map: gridTexture })
+const gridTexture = new THREE.TextureLoader().load("/brax/js/assets/grid.png");
+const gridMaterial = new THREE.MeshLambertMaterial({ map: gridTexture, color: 0xe0e0e0 })
 
 function createCapsule(capsule) {
   console.log("createCapsule invoked")
+  console.log("gridMaterial")
 
   const sphere_geom = new THREE.SphereGeometry(capsule.radius, 16, 16);
   const cylinder_geom = new THREE.CylinderGeometry(
