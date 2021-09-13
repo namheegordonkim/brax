@@ -2,31 +2,23 @@ import * as THREE from 'https://threejs.org/build/three.module.js';
 
 const basicMaterial = new THREE.MeshPhongMaterial({color: 0x665544});
 const targetMaterial = new THREE.MeshPhongMaterial({color: 0xff2222});
-const gridTexture = new THREE.TextureLoader().load("/brax/js/assets/grid.png");
-const gridMaterial = new THREE.MeshLambertMaterial({ map: gridTexture, color: 0xe0e0e0 })
 
 function createCapsule(capsule) {
-  console.log("createCapsule invoked")
-  console.log("gridMaterial")
-
   const sphere_geom = new THREE.SphereGeometry(capsule.radius, 16, 16);
   const cylinder_geom = new THREE.CylinderGeometry(
       capsule.radius, capsule.radius, capsule.length - 2 * capsule.radius);
 
-  // const sphere1 = new THREE.Mesh(sphere_geom, basicMaterial);
-  const sphere1 = new THREE.Mesh(sphere_geom, gridMaterial);
+  const sphere1 = new THREE.Mesh(sphere_geom, basicMaterial);
   sphere1.baseMaterial = sphere1.material;
   sphere1.position.set(0, capsule.length / 2 - capsule.radius, 0);
   sphere1.castShadow = true;
 
-  // const sphere2 = new THREE.Mesh(sphere_geom, basicMaterial);
-  const sphere2 = new THREE.Mesh(sphere_geom, gridMaterial);
+  const sphere2 = new THREE.Mesh(sphere_geom, basicMaterial);
   sphere2.baseMaterial = sphere2.material;
   sphere2.position.set(0, -capsule.length / 2 + capsule.radius, 0);
   sphere2.castShadow = true;
 
-  // const cylinder = new THREE.Mesh(cylinder_geom, basicMaterial);
-  const cylinder = new THREE.Mesh(cylinder_geom, gridMaterial);
+  const cylinder = new THREE.Mesh(cylinder_geom, basicMaterial);
   cylinder.baseMaterial = cylinder.material;
   cylinder.castShadow = true;
 

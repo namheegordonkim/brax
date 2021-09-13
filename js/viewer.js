@@ -11,8 +11,6 @@ import {Animator} from './animator.js';
 import {Selector} from './selector.js';
 import {createScene, createTrajectory} from './system.js';
 
-console.log("viewer.js")
-
 function downloadDataUri(name, uri) {
   let link = document.createElement('a');
   link.download = name;
