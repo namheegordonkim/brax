@@ -170,6 +170,44 @@ class CapsuleTest(absltest.TestCase):
     }
   """
 
+  _CONFIG2 = """
+      dt: 5 substeps: 5000 friction: 0.6 baumgarte_erp: 0.1
+      gravity { z: -9.8 }
+      bodies {
+        name: "Capsule1" mass: 1
+        colliders { capsule { radius: 0.25 length: 1.0 } friction: 0.4 }
+        inertia { x: 1 y: 1 z: 1 }
+      }
+      bodies {
+        name: "Capsule2" mass: 1
+        colliders { rotation { y: 90 } capsule { radius: 0.25 length: 1.0 }}
+        inertia { x: 1 y: 1 z: 1 }
+      }
+      bodies {
+        name: "Capsule3" mass: 1
+        colliders { rotation { y: 45 } capsule { radius: 0.25 length: 1.0 }}
+        inertia { x: 1 y: 1 z: 1 }
+      }
+      bodies {
+        name: "Capsule4" mass: 1
+        colliders { rotation { x: 45 } capsule { radius: 0.25 length: 1.0 }}
+        inertia { x: 1 y: 1 z: 1 }
+      }
+      bodies { name: "Ground" frozen: { all: true } colliders { plane {} friction: 1.0 }}
+      defaults {
+        qps { name: "Capsule1" pos {z: 1}}
+        qps { name: "Capsule2" pos {x:1 z: 1}}
+        qps { name: "Capsule3" pos {x:3 z: 1}}
+        qps { name: "Capsule4" pos {x:5 z: 1}}
+      }
+      defaults {
+        qps { name: "Capsule1" pos {z: 1}}
+        qps { name: "Capsule2" pos {z: 2}}
+        qps { name: "Capsule3" pos {x:3 z: 1}}
+        qps { name: "Capsule4" pos {x:5 z: 1}}
+      }
+    """
+
   def test_capsule_hits_ground(self):
     """A capsule falls onto the ground and stops."""
     sys = brax.System(text_format.Parse(CapsuleTest._CONFIG, brax.Config()))
@@ -188,6 +226,24 @@ class CapsuleTest(absltest.TestCase):
     self.assertAlmostEqual(qp.pos[0, 2], 0.5, 2)  # standing up and down
     self.assertAlmostEqual(qp.pos[1, 2], 1.25, 2)  # lying on Capsule1
 
+  # Per-collider fricition tests
+  def test_capsule_hits_ground2(self):
+    """A capsule falls onto the ground and stops."""
+    sys = brax.System(text_format.Parse(CapsuleTest._CONFIG2, brax.Config()))
+    qp = sys.default_qp(0)
+    qp, _ = sys.step(qp, jnp.array([]))
+    self.assertAlmostEqual(qp.pos[0, 2], 0.5, 2)  # standing up and down
+    self.assertAlmostEqual(qp.pos[1, 2], 0.25, 2)  # lying on its side
+    self.assertAlmostEqual(qp.pos[2, 2], 0.25, 2)  # rolls to side from y rot
+    self.assertAlmostEqual(qp.pos[3, 2], 0.25, 2)  # rolls to side from x rot
+
+  def test_capsule_hits_capsule2(self):
+    """A capsule falls onto another capsule and balances on it."""
+    sys = brax.System(text_format.Parse(CapsuleTest._CONFIG2, brax.Config()))
+    qp = sys.default_qp(1)
+    qp, _ = sys.step(qp, jnp.array([]))
+    self.assertAlmostEqual(qp.pos[0, 2], 0.5, 2)  # standing up and down
+    self.assertAlmostEqual(qp.pos[1, 2], 1.25, 2)  # lying on Capsule1
 
 class JointTest(parameterized.TestCase):
 
