@@ -78,14 +78,9 @@ def train(
     progress_fn: Optional[Callable[[int, Dict[str, Any]], None]] = None,
 ):
   """ARS."""
-  # TODO: pmap it
-  max_devices_per_host = 1
-
   xt = time.time()
   top_directions = min(top_directions, number_of_directions)
   num_envs = number_of_directions * 2  # antitethic
-  epochs = 1 + num_timesteps // episode_length // num_envs
-  log_frequency = min(log_frequency, epochs)
 
   process_count = jax.process_count()
   process_id = jax.process_index()
@@ -106,13 +101,16 @@ def train(
       action_repeat=action_repeat,
       batch_size=num_envs // local_devices_to_use // process_count,
       episode_length=episode_length)
-  first_state, step_fn = env.wrap(core_env, key_env)
+  key_envs = jax.random.split(key_env, local_devices_to_use)
+  step_fn = core_env.step
+  first_state = jax.tree_multimap(lambda *args: jnp.stack(args),
+                                  *[core_env.reset(key) for key in key_envs])
 
   core_eval_env = environment_fn(
       action_repeat=action_repeat,
       batch_size=num_eval_envs,
       episode_length=episode_length)
-  eval_first_state, eval_step_fn = env.wrap(core_eval_env, key_eval)
+  eval_first_state, eval_step_fn = env.wrap_for_eval(core_eval_env, key_eval)
 
   _, obs_size = eval_first_state.core.obs.shape
 
@@ -122,7 +120,7 @@ def train(
   normalizer_params, obs_normalizer_update_fn, obs_normalizer_apply_fn = (
       normalization.create_observation_normalizer(
           obs_size, normalize_observations, num_leading_batch_dims=1,
-          apply_clipping=False))
+          apply_clipping=False, pmap_to_devices=local_devices_to_use))
 
   policy_params = policy_model.init(key_model)
 
@@ -134,7 +132,8 @@ def train(
     return (nstate, policy_params, normalizer_params), ()
 
   @jax.jit
-  def run_eval(state, policy_params, normalizer_params) -> env.EnvState:
+  def run_eval(state, policy_params, normalizer_params) -> env.EvalEnvState:
+    normalizer_params = jax.tree_map(lambda x: x[0], normalizer_params)
     (state, _, _), _ = jax.lax.scan(
         do_one_step_eval, (state, policy_params, normalizer_params), (),
         length=episode_length // action_repeat)
@@ -144,21 +143,27 @@ def train(
   def training_inference(params, obs):
     return policy_model.apply(params, obs)
 
-  def do_one_step(carry, unused_target_t):
-    state, policy_params, cumulative_reward, normalizer_params = carry
-    obs = obs_normalizer_apply_fn(normalizer_params, state.core.obs)
+  def do_one_step(args):
+    state, policy_params, cumulative_reward, active_episode, normalizer_params, new_normalizer_params = args
+    obs = obs_normalizer_apply_fn(normalizer_params, state.obs)
     actions = policy_head(training_inference(policy_params, obs))
     nstate = step_fn(state, actions)
-    cumulative_reward = cumulative_reward + nstate.core.reward - reward_shift
-    return (nstate, policy_params, cumulative_reward,
-            normalizer_params), state.core.obs
+    cumulative_reward = cumulative_reward + (nstate.reward -
+                                             reward_shift) * active_episode
+    new_active_episode = active_episode * (1 - nstate.done)
+    new_normalizer_params = obs_normalizer_update_fn(new_normalizer_params,
+                                                     state.obs,
+                                                     active_episode)
+    return nstate, policy_params, cumulative_reward, new_active_episode, normalizer_params, new_normalizer_params
 
   def run_ars_eval(state, params, normalizer_params):
-    cumulative_reward = jnp.zeros(state.core.obs.shape[0])
-    (state, _, cumulative_reward, _), obs = jax.lax.scan(
-        do_one_step, (state, params, cumulative_reward, normalizer_params),
-        (), length=episode_length // action_repeat)
-    return cumulative_reward, obs, state
+    cumulative_reward = jnp.zeros(state.obs.shape[0])
+    active_episode = jnp.ones(state.obs.shape[0])
+    _, _, cumulative_reward, _, _, normalizer_params = jax.lax.while_loop(
+        lambda a: jax.lax.psum(jnp.sum(a[3]), axis_name='i') > 0, do_one_step,
+        (state, params, cumulative_reward, active_episode, normalizer_params,
+         normalizer_params))
+    return cumulative_reward, normalizer_params
 
   def add_noise(params, key):
     noise = jax.random.normal(key, shape=params.shape, dtype=params.dtype)
@@ -166,8 +171,8 @@ def train(
     anit_params_with_noise = params - noise * exploration_noise_std
     return params_with_noise, anit_params_with_noise, noise
 
-  def ars_one_epoch(carry, unused_t):
-    state, training_state = carry
+  @jax.jit
+  def ars_one_epoch(state, training_state):
     params = jnp.repeat(jnp.expand_dims(training_state.policy_params, axis=0),
                         num_envs // 2, axis=0)
 
@@ -179,13 +184,15 @@ def train(
     pparams = jnp.concatenate([params_with_noise, params_with_anti_noise],
                               axis=0)
 
-    eval_scores, obs, state = run_ars_eval(
+    pparams = jax.tree_map(
+        lambda x: jnp.reshape(x, [local_devices_to_use, -1] + list(x.shape[1:])
+                             ), pparams)
+
+    prun_ars_eval = jax.pmap(run_ars_eval, axis_name='i')
+    eval_scores, normalizer_params = prun_ars_eval(
         state, pparams, training_state.normalizer_params)
 
-    obs = jnp.reshape(obs, [-1] + list(obs.shape[2:]))
-
-    normalizer_params = obs_normalizer_update_fn(
-        training_state.normalizer_params, obs)
+    eval_scores = jnp.reshape(eval_scores, [-1])
 
     reward_plus, reward_minus = jnp.split(eval_scores, 2, axis=0)
     reward_max = jnp.maximum(reward_plus, reward_minus)
@@ -208,18 +215,10 @@ def train(
         'reward_std': reward_std,
         'weights': jnp.mean(reward_weight),
     }
-    return (state,
-            TrainingState(
-                key=key,
-                normalizer_params=normalizer_params,
-                policy_params=policy_params)), metrics
-
-  epochs_per_step = (epochs + log_frequency - 1) // log_frequency
-  @jax.jit
-  def run_ars(state, training_state):
-    (state, training_state), metrics = jax.lax.scan(
-        ars_one_epoch, (state, training_state), (), length=epochs_per_step)
-    return state, training_state, jax.tree_map(jnp.mean, metrics)
+    return TrainingState(
+        key=key,
+        normalizer_params=normalizer_params,
+        policy_params=policy_params), metrics
 
   training_state = TrainingState(key=key,
                                  normalizer_params=normalizer_params,
@@ -232,12 +231,16 @@ def train(
   metrics = {}
   summary = {}
   state = first_state
+  it = -1
 
-  for it in range(log_frequency + 1):
+  while True:
+    it += 1
     logging.info('starting iteration %s %s', it, time.time() - xt)
     t = time.time()
+    num_process_env_steps = int(
+        training_state.normalizer_params[0][0]) * action_repeat
 
-    if process_id == 0:
+    if process_id == 0 and it % log_frequency == 0:
       eval_state = run_eval(eval_first_state,
                             training_state.policy_params,
                             training_state.normalizer_params)
@@ -259,36 +262,40 @@ def train(
           **dict({
               'eval/completed_episodes': eval_state.completed_episodes,
               'eval/episode_length': avg_episode_length,
+              'train/completed_episodes': it * num_envs,
               'speed/sps': sps,
               'speed/eval_sps': eval_sps,
               'speed/training_walltime': training_walltime,
               'speed/eval_walltime': eval_walltime,
               'speed/timestamp': training_walltime,
           }))
-      logging.info('Step %s metrics %s',
-                   int(training_state.normalizer_params[0]) * action_repeat,
-                   metrics)
+      logging.info('Step %s metrics %s', num_process_env_steps, metrics)
       if progress_fn:
-        progress_fn(int(training_state.normalizer_params[0]) * action_repeat,
-                    metrics)
+        progress_fn(num_process_env_steps, metrics)
 
-    if it == log_frequency:
+    if num_process_env_steps > num_timesteps:
       break
 
     t = time.time()
     # optimization
-    state, training_state, summary = run_ars(state, training_state)
+    training_state, summary = ars_one_epoch(state, training_state)
+    # Don't override state with new_state. For environments with variable
+    # episode length we still want to start from a 'reset', not from where the
+    # last run finished.
 
     jax.tree_map(lambda x: x.block_until_ready(), training_state)
-    sps = episode_length * num_envs * epochs_per_step / (
-        time.time() - t)
+    sps = (int(training_state.normalizer_params[0][0]) * action_repeat -
+           num_process_env_steps) / (
+               time.time() - t)
     training_walltime += time.time() - t
 
   _, inference = make_params_and_inference_fn(core_env.observation_size,
                                               core_env.action_size,
                                               normalize_observations,
                                               head_type)
-  params = training_state.normalizer_params, training_state.policy_params
+  normalizer_params = jax.tree_map(lambda x: x[0],
+                                   training_state.normalizer_params)
+  params = normalizer_params, training_state.policy_params
 
   return (inference, params, metrics)
 

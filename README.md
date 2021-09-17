@@ -17,7 +17,8 @@ to minutes:
 
 *   Baseline learning algorithms such as
     [PPO](https://github.com/google/brax/blob/main/brax/training/ppo.py),
-    [SAC](https://github.com/google/brax/blob/main/brax/training/sac.py), and
+    [SAC](https://github.com/google/brax/blob/main/brax/training/sac.py),
+    [ARS](https://github.com/google/brax/blob/main/brax/training/ars.py), and
     [evolutionary strategies](https://github.com/google/brax/blob/main/brax/training/es.py).
 *   Learning algorithms that leverage the differentiability of the simulator, such as [analytic policy gradients](https://github.com/google/brax/blob/main/brax/training/apg.py).
 
@@ -30,7 +31,6 @@ Explore Brax easily and quickly through a series of colab notebooks:
 * [Brax + PyTorch](https://colab.research.google.com/github/google/brax/blob/main/notebooks/pytorch.ipynb) demonstrates how to operate Brax environments performantly from PyTorch.
 
 ## Using Brax locally
-
 
 To install Brax from pypi, install it with:
 
@@ -49,8 +49,6 @@ source env/bin/activate
 pip install --upgrade pip
 pip install -e .
 ```
-
-
 
 To train a model:
 
@@ -76,7 +74,7 @@ If you would like to reference Brax in a publication, please use:
   author = {C. Daniel Freeman and Erik Frey and Anton Raichuk and Sertan Girgin and Igor Mordatch and Olivier Bachem},
   title = {Brax - A Differentiable Physics Engine for Large Scale Rigid Body Simulation},
   url = {http://github.com/google/brax},
-  version = {0.0.4},
+  version = {0.0.5},
   year = {2021},
 }
 ```
