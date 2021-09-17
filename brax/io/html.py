@@ -29,12 +29,14 @@ from google.protobuf import json_format
 def save_html(path: str,
               sys: brax.System,
               qps: List[brax.QP],
+              js_path: str,
               make_dir: bool = False):
   """Saves trajectory as a HTML file."""
+
   if make_dir and path:
     MakeDirs(os.path.dirname(path))
   with File(path, 'w') as fout:
-    fout.write(render(sys, qps))
+    fout.write(render(sys, qps).replace("<!-- js path goes here -->", js_path))
 
 
 def render(sys: brax.System, qps: List[brax.QP]) -> str:
@@ -76,7 +78,7 @@ _HTML = """
     <div id="brax-viewer"></div>
 
     <script type="module">
-      import {Viewer} from '../brax/js/viewer.js';
+      import {Viewer} from '<!-- js path goes here -->/viewer.js';
       const domElement = document.getElementById('brax-viewer');
       var viewer = new Viewer(domElement, system);
     </script>
