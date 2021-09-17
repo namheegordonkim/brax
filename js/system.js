@@ -13,7 +13,7 @@ function createCapsule(capsule, name) {
   const cylinder_geom = new THREE.CylinderGeometry(
       capsule.radius, capsule.radius, capsule.length - 2 * capsule.radius);
 
-  let mat = name == '$ Goal' ? targetMaterial : basicMaterial;
+  let mat = name.includes('Goal') ? targetMaterial : basicMaterial;
   const sphere1 = new THREE.Mesh(sphere_geom, mat);
   // const sphere1 = new THREE.Mesh(sphere_geom, gridMaterial);
   sphere1.baseMaterial = sphere1.material;
