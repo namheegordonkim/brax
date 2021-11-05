@@ -11,6 +11,8 @@ import {Animator} from './animator.js';
 import {Selector} from './selector.js';
 import {createScene, createTrajectory} from './system.js';
 
+console.log("viewer.js")
+
 function downloadDataUri(name, uri) {
   let link = document.createElement('a');
   link.download = name;
@@ -49,7 +51,7 @@ class Viewer {
     this.trajectory = createTrajectory(system);
 
     /* set up renderer, camera, and add default scene elements */
-    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputEncoding = THREE.sRGBEncoding;

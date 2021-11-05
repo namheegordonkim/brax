@@ -66,7 +66,6 @@ class Contact:
     self.normal = normal
     self.penetration = penetration
 
-
 class Cull(abc.ABC):
   """Selects collidable pair candidates for collision detection."""
 
@@ -146,6 +145,8 @@ class Collider(abc.ABC):
     self.contact_fn = contact_fn
     self.cull = cull
     self.friction = config.friction
+    col =
+    self.friction = col.material.friction if col.material.HasField("friction") else config.friction
     self.elasticity = config.elasticity
     self.baumgarte_erp = config.baumgarte_erp * config.substeps / config.dt
 
