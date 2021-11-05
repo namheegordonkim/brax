@@ -35,10 +35,12 @@ class Collidable:
   corner collidables.
   """
 
-  def __init__(self, collidables: List[config_pb2.Body], body: bodies.Body):
+  def __init__(self, collidables: List[config_pb2.Body], body: bodies.Body, config: config_pb2.Config):
     self.body = jp.take(body, [body.index[c.name] for c in collidables])
     self.pos = jp.array(
         [vec_to_arr(c.colliders[0].position) for c in collidables])
+    self.friction = jp.array([c.colliders[0].material.friction if c.colliders[0].material.HasField("friction")
+                              else config.friction for c in collidables])
 
   def position(self, qp: QP) -> jp.ndarray:
     """Returns the collidable's position in world space."""
@@ -65,6 +67,7 @@ class Contact:
     self.vel = vel
     self.normal = normal
     self.penetration = penetration
+
 
 class Cull(abc.ABC):
   """Selects collidable pair candidates for collision detection."""
@@ -145,8 +148,6 @@ class Collider(abc.ABC):
     self.contact_fn = contact_fn
     self.cull = cull
     self.friction = config.friction
-    col =
-    self.friction = col.material.friction if col.material.HasField("friction") else config.friction
     self.elasticity = config.elasticity
     self.baumgarte_erp = config.baumgarte_erp * config.substeps / config.dt
 
@@ -200,7 +201,7 @@ class OneWayCollider(Collider):
     vel_d = contact.vel - normal_vel * contact.normal
     impulse_d = jp.safe_norm(vel_d) / ((1. / (col.body.mass)) + ang)
     # drag magnitude cannot exceed max friction
-    impulse_d = jp.minimum(impulse_d, self.friction * impulse)
+    impulse_d = jp.minimum(impulse_d, col.friction * impulse)
     dir_d = vel_d / (1e-6 + jp.safe_norm(vel_d))
     dp_d = col.body.impulse(qp, -impulse_d * dir_d, contact.pos)
     # apply collision if penetrating, approaching, and oriented correctly
@@ -258,8 +259,10 @@ class TwoWayCollider(Collider):
     vel_d = contact.vel - normal_vel * contact.normal
     impulse_d = jp.safe_norm(vel_d) / ((1. / col_a.body.mass) +
                                        (1. / col_b.body.mass) + ang)
+    # select friction coefficients (combine by multiplication rule by default)
+    friction = col_a.friction * col_b.friction
     # drag magnitude cannot exceed max friction
-    impulse_d = jp.minimum(impulse_d, self.friction * impulse)
+    impulse_d = jp.minimum(impulse_d, friction * impulse)
     dir_d = vel_d / (1e-6 + jp.safe_norm(vel_d))
     dp_d_a = col_a.body.impulse(qp_a, impulse_d * dir_d, contact.pos)
     dp_d_b = col_a.body.impulse(qp_b, -impulse_d * dir_d, contact.pos)
@@ -278,8 +281,8 @@ class TwoWayCollider(Collider):
 class BoxCorner(Collidable):
   """A box corner."""
 
-  def __init__(self, boxes: List[config_pb2.Body], body: bodies.Body):
-    super().__init__([boxes[i // 8] for i in range(len(boxes) * 8)], body)
+  def __init__(self, boxes: List[config_pb2.Body], body: bodies.Body, config: config_pb2.Config):
+    super().__init__([boxes[i // 8] for i in range(len(boxes) * 8)], body, config)
     coords = jp.array(list(itertools.product((-1, 1), (-1, 1), (-1, 1))))
     corners = []
     for b in boxes:
@@ -301,8 +304,8 @@ class Plane(Collidable):
 class Capsule(Collidable):
   """A capsule with an ends pointing in the +z, -z directions."""
 
-  def __init__(self, capsules: List[config_pb2.Body], body: bodies.Body):
-    super().__init__(capsules, body)
+  def __init__(self, capsules: List[config_pb2.Body], body: bodies.Body, config: config_pb2.Config):
+    super().__init__(capsules, body, config)
     ends = []
     radii = []
     for c in capsules:
@@ -320,9 +323,9 @@ class Capsule(Collidable):
 class CapsuleEnd(Collidable):
   """A capsule with variable ends either in the +z or -z directions."""
 
-  def __init__(self, capsules: List[config_pb2.Body], body: bodies.Body):
+  def __init__(self, capsules: List[config_pb2.Body], body: bodies.Body, config: config_pb2.Config):
     var_caps = [[c] if c.colliders[0].capsule.end else [c, c] for c in capsules]
-    super().__init__(sum(var_caps, []), body)
+    super().__init__(sum(var_caps, []), body, config)
     ends = []
     radii = []
     for c in capsules:
@@ -341,8 +344,8 @@ class CapsuleEnd(Collidable):
 class HeightMap(Collidable):
   """A height map with heights in a grid layout."""
 
-  def __init__(self, heightmaps: List[config_pb2.Body], body: bodies.Body):
-    super().__init__(heightmaps, body)
+  def __init__(self, heightmaps: List[config_pb2.Body], body: bodies.Body, config: config_pb2.Config):
+    super().__init__(heightmaps, body, config)
     heights = []
     cell_sizes = []
     for h in heightmaps:
@@ -515,9 +518,9 @@ def get(config: config_pb2.Config, body: bodies.Body) -> List[Collider]:
     # create our collidables
     col_cls_a, col_cls_b, contact_fn = supported_types[(type_a, type_b)]
     if col_cls_a not in collidable_cache:
-      collidable_cache[col_cls_a] = col_cls_a(cols_a, body)
+      collidable_cache[col_cls_a] = col_cls_a(cols_a, body, config)
     if col_cls_b not in collidable_cache:
-      collidable_cache[col_cls_b] = col_cls_b(cols_b, body)
+      collidable_cache[col_cls_b] = col_cls_b(cols_b, body, config)
     col_a = collidable_cache[col_cls_a]
     col_b = collidable_cache[col_cls_b]
 
