@@ -262,13 +262,14 @@ def train(
   # SAC
   target_entropy = -0.5 * core_env.action_size
 
-  def alpha_loss(alpha: jnp.ndarray, policy_params: Params,
+  def alpha_loss(log_alpha: jnp.ndarray, policy_params: Params,
                  transitions: Transition, key: PRNGKey) -> jnp.ndarray:
     """Eq 18 from https://arxiv.org/pdf/1812.05905.pdf."""
     dist_params = policy_model.apply(policy_params, transitions.o_tm1)
     action = parametric_action_distribution.sample_no_postprocessing(
         dist_params, key)
     log_prob = parametric_action_distribution.log_prob(dist_params, action)
+    alpha = jnp.exp(log_alpha)
     alpha_loss = alpha * jax.lax.stop_gradient(-log_prob - target_entropy)
     return jnp.mean(alpha_loss)
 
@@ -339,9 +340,10 @@ def train(
       new_rewarder_state = state.rewarder_state
       rewarder_metrics = {}
 
-    alpha = jnp.exp(state.alpha_params)
-    alpha_loss, alpha_grads = alpha_grad(alpha, state.policy_params,
+    alpha_loss, alpha_grads = alpha_grad(state.alpha_params,
+                                         state.policy_params,
                                          normalized_transitions, key_alpha)
+    alpha = jnp.exp(state.alpha_params)
     critic_loss, critic_grads = critic_grad(state.q_params, state.policy_params,
                                             state.target_q_params, alpha,
                                             normalized_transitions, key_critic)
@@ -553,7 +555,7 @@ def train(
         policy_params = jax.tree_map(lambda x: x[0],
                                      training_state.policy_params)
         params = normalizer_params, policy_params
-        path = f'{checkpoint_logdir}_sac_{current_step}.flax'
+        path = f'{checkpoint_logdir}_sac_{current_step}.pkl'
         model.save_params(path, params)
 
     if current_step >= num_timesteps:
@@ -589,19 +591,17 @@ def train(
 
   logging.info('total steps: %s', normalizer_params[0] * action_repeat)
 
-  _, inference = make_params_and_inference_fn(core_env.observation_size,
-                                              core_env.action_size,
-                                              normalize_observations)
+  inference = make_inference_fn(core_env.observation_size, core_env.action_size,
+                                normalize_observations)
   params = normalizer_params, policy_params
 
   pmap.synchronize_hosts()
   return (inference, params, metrics)
 
 
-def make_params_and_inference_fn(observation_size, action_size,
-                                 normalize_observations):
+def make_inference_fn(observation_size, action_size, normalize_observations):
   """Creates params and inference function for the SAC agent."""
-  obs_normalizer_params, obs_normalizer_apply_fn = normalization.make_data_and_apply_fn(
+  _, obs_normalizer_apply_fn = normalization.make_data_and_apply_fn(
       observation_size, normalize_observations)
   parametric_action_distribution = distribution.NormalTanhDistribution(
       event_size=action_size)
@@ -615,5 +615,4 @@ def make_params_and_inference_fn(observation_size, action_size,
         policy_model.apply(policy_params, obs), key)
     return action
 
-  params = (obs_normalizer_params, policy_model.init(jax.random.PRNGKey(0)))
-  return params, inference_fn
+  return inference_fn
