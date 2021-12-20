@@ -37,8 +37,7 @@ def save_html(path: str,
     fout.write(render(sys, qps))
 
 
-def render(sys: brax.System, qps: List[brax.QP], height: int = 480) -> str:
-  """Returns an HTML page that visualizes the system and qps trajectory."""
+def render(sys: brax.System, qps: List[brax.QP]) -> str:
   if any((len(qp.pos.shape), len(qp.rot.shape)) != (2, 2) for qp in qps):
     raise RuntimeError('unexpected shape in qp.')
   d = {
@@ -47,13 +46,12 @@ def render(sys: brax.System, qps: List[brax.QP], height: int = 480) -> str:
       'rot': [qp.rot for qp in qps],
   }
   system = json.dumps(d, cls=JaxEncoder)
-  html = _HTML.replace('<!-- system json goes here -->', system)
-  html = html.replace('<!-- viewer height goes here -->', f'{height}px')
-  return html
+  return _HTML.replace('<!-- system json goes here -->', system)
 
 
 _HTML = """
 <html>
+
   <head>
     <title>brax visualizer</title>
     <style>
@@ -61,20 +59,24 @@ _HTML = """
         margin: 0;
         padding: 0;
       }
+
       #brax-viewer {
         margin: 0;
         padding: 0;
-        height: <!-- viewer height goes here -->;
+        height: 480px;
       }
     </style>
   </head>
+
   <body>
     <script type="application/javascript">
     var system = <!-- system json goes here -->;
     </script>
+
     <div id="brax-viewer"></div>
+
     <script type="module">
-      import {Viewer} from 'https://cdn.jsdelivr.net/gh/google/brax@v0.0.7/js/viewer.js';
+      import {Viewer} from 'https://cdn.jsdelivr.net/gh/google/brax@6039109a102ca2ed4baaaf5bc595bdf3aaecc89f/js/viewer.js';
       const domElement = document.getElementById('brax-viewer');
       var viewer = new Viewer(domElement, system);
     </script>

@@ -11,8 +11,6 @@ import {Animator} from './animator.js';
 import {Selector} from './selector.js';
 import {createScene, createTrajectory} from './system.js';
 
-console.log("viewer.js")
-
 function downloadDataUri(name, uri) {
   let link = document.createElement('a');
   link.download = name;
@@ -51,7 +49,7 @@ class Viewer {
     this.trajectory = createTrajectory(system);
 
     /* set up renderer, camera, and add default scene elements */
-    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
+    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
@@ -86,8 +84,8 @@ class Viewer {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enablePan = false;
     this.controls.enableDamping = true;
-    this.controls.addEventListener('start', () => {this.setDirty();});
-    this.controls.addEventListener('change', () => {this.setDirty();});
+    this.controls.addEventListener('start', () => {this.setDirty()});
+    this.controls.addEventListener('change', () => {this.setDirty()});
     this.controlTargetPos = this.controls.target.clone();
 
     /* set up gui */
@@ -162,9 +160,6 @@ class Viewer {
     window.addEventListener('resize', (evt) => this.setSize(), false);
     requestAnimationFrame(() => this.setSize());
 
-    const resizeObserver = new ResizeObserver(() => this.resizeCanvasToDisplaySize());
-    resizeObserver.observe(this.domElement, {box: 'content-box'});
-
     /* start animation */
     this.animate();
   }
@@ -189,13 +184,6 @@ class Viewer {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.setDirty();
-  }
-
-  resizeCanvasToDisplaySize() {
-    //look up canvas size
-    const width = this.domElement.clientWidth;
-    const height = this.domElement.clientHeight;
-    this.setSize(width, height);
   }
 
   render() {

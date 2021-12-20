@@ -10,7 +10,6 @@ class Animator {
     this.time = 0;
     this.timeScrubber = null;
     this.duration = 0;
-    this.loop = true;
   }
 
   play() {
@@ -45,11 +44,6 @@ class Animator {
     this.viewer.setDirty();
   }
 
-  setLoop(loop) {
-    this.loop = loop;
-    this.action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-  }
-
   reset() {
     this.action.reset();
     this.displayProgress(0);
@@ -69,20 +63,23 @@ class Animator {
     this.clear();
 
     if (options.play === undefined) {
-      options.play = true;
+      options.play = true
     }
-    if (options.loop == undefined) {
-      options.loop = true;
+    if (options.loopMode === undefined) {
+      options.loopMode = THREE.LoopRepeat
+    }
+    if (options.repetitions === undefined) {
+      options.repetitions = 1
     }
     if (options.clampWhenFinished === undefined) {
-      options.clampWhenFinished = true;
+      options.clampWhenFinished = true
     }
 
     this.duration = 0;
     this.progress = 0;
     this.action = this.mixer.clipAction(trajectory);
     this.action.clampWhenFinished = options.clampWhenFinished;
-    this.setLoop(options.loop);
+    this.action.setLoop(options.loopMode, options.repetitions);
     this.duration = trajectory.duration;
 
     if (this.duration > 0) {
@@ -93,8 +90,8 @@ class Animator {
 
       this.timeScrubber = this.folder.add(this, 'time', 0, this.duration, 0.001);
       this.timeScrubber.onChange((value) => this.seek(value));
+
       this.folder.add(this.mixer, 'timeScale').step(0.01).min(0);
-      this.folder.add(this, 'loop').onChange((value) => this.setLoop(value));
     }
 
     this.reset();

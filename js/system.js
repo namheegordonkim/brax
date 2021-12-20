@@ -1,33 +1,24 @@
 import * as THREE from 'https://threejs.org/build/three.module.js';
 
-const basicMaterial = new THREE.MeshPhongMaterial({color: 0x665544, wireframe: true});
-const targetMaterial = new THREE.MeshPhongMaterial({color: 0xff2222, wireframe: true});
-const gridTexture = new THREE.TextureLoader().load("/brax/js/assets/grid.png");
-const gridMaterial = new THREE.MeshLambertMaterial({ map: gridTexture, color: 0xe0e0e0 })
+const basicMaterial = new THREE.MeshPhongMaterial({color: 0x665544});
+const targetMaterial = new THREE.MeshPhongMaterial({color: 0xff2222});
 
-function createCapsule(capsule, name) {
-  console.log("createCapsule invoked")
-  console.log("gridMaterial")
-
+function createCapsule(capsule) {
   const sphere_geom = new THREE.SphereGeometry(capsule.radius, 16, 16);
   const cylinder_geom = new THREE.CylinderGeometry(
       capsule.radius, capsule.radius, capsule.length - 2 * capsule.radius);
 
-  let mat = name.includes('Goal') ? targetMaterial : basicMaterial;
-  const sphere1 = new THREE.Mesh(sphere_geom, mat);
-  // const sphere1 = new THREE.Mesh(sphere_geom, gridMaterial);
+  const sphere1 = new THREE.Mesh(sphere_geom, basicMaterial);
   sphere1.baseMaterial = sphere1.material;
   sphere1.position.set(0, capsule.length / 2 - capsule.radius, 0);
   sphere1.castShadow = true;
 
-  const sphere2 = new THREE.Mesh(sphere_geom, mat);
-  // const sphere2 = new THREE.Mesh(sphere_geom, gridMaterial);
+  const sphere2 = new THREE.Mesh(sphere_geom, basicMaterial);
   sphere2.baseMaterial = sphere2.material;
   sphere2.position.set(0, -capsule.length / 2 + capsule.radius, 0);
   sphere2.castShadow = true;
 
-  const cylinder = new THREE.Mesh(cylinder_geom, mat);
-  // const cylinder = new THREE.Mesh(cylinder_geom, gridMaterial);
+  const cylinder = new THREE.Mesh(cylinder_geom, basicMaterial);
   cylinder.baseMaterial = cylinder.material;
   cylinder.castShadow = true;
 
@@ -48,24 +39,24 @@ function createBox(box) {
 function createPlane(plane) {
   const group = new THREE.Group();
   const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.24, 1.12),
+      new THREE.PlaneGeometry(2000, 2000),
       new THREE.MeshPhongMaterial({color: 0x999999, depthWrite: false}));
   mesh.rotation.x = -Math.PI / 2;
   mesh.receiveShadow = true;
   mesh.baseMaterial = mesh.material;
   group.add(mesh);
 
-  const mesh2 = new THREE.GridHelper(20, 20, 0x000000, 0x000000);
+  const mesh2 = new THREE.GridHelper(2000, 2000, 0x000000, 0x000000);
   mesh2.material.opacity = 0.4;
   mesh2.material.transparent = true;
   mesh2.baseMaterial = mesh2.material;
-  // group.add(mesh2);
+  group.add(mesh2);
   return group;
 }
 
 function createSphere(sphere, name) {
   const geom = new THREE.SphereGeometry(sphere.radius, 16, 16);
-  let mat = name.toLowerCase() == 'target' ? targetMaterial : gridMaterial;
+  let mat = name.toLowerCase() == 'target' ? targetMaterial : basicMaterial;
   const mesh = new THREE.Mesh(geom, mat);
   mesh.castShadow = true;
   mesh.baseMaterial = mesh.material;
@@ -112,7 +103,7 @@ function createScene(system) {
       if ('box' in collider) {
         child = createBox(collider.box);
       } else if ('capsule' in collider) {
-        child = createCapsule(collider.capsule, body.name);
+        child = createCapsule(collider.capsule);
       } else if ('plane' in collider) {
         child = createPlane(collider.plane);
       } else if ('sphere' in collider) {
