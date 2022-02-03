@@ -1,25 +1,42 @@
 import * as THREE from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/build/three.module.js';
 import 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/geometries/ParametricGeometry.js';
 
-const basicMaterial = new THREE.MeshPhongMaterial({color: 0x665544});
-const targetMaterial = new THREE.MeshPhongMaterial({color: 0xff2222});
 
-function createCapsule(capsule) {
+const basicMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00, wireframe: true});
+const goalMaterial = new THREE.MeshPhongMaterial({color: 0xff2222, wireframe: true});
+const targetMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00, wireframe: true});
+const cueMaterial = new THREE.MeshPhongMaterial({color: 0x665544, wireframe: true});
+const gridTexture = new THREE.TextureLoader().load("/brax/js/assets/grid.png");
+const gridMaterial = new THREE.MeshLambertMaterial({ map: gridTexture, color: 0xe0e0e0 })
+
+function createCapsule(capsule, name) {
+  console.log("createCapsule invoked")
+  console.log("gridMaterial")
+  console.log(capsule)
+
   const sphere_geom = new THREE.SphereGeometry(capsule.radius, 16, 16);
   const cylinder_geom = new THREE.CylinderGeometry(
       capsule.radius, capsule.radius, capsule.length - 2 * capsule.radius);
 
-  const sphere1 = new THREE.Mesh(sphere_geom, basicMaterial);
+  let mat = name.includes('Goal') ?
+      goalMaterial :
+      name.includes('Cue') ?
+          cueMaterial :
+          basicMaterial;
+  const sphere1 = new THREE.Mesh(sphere_geom, mat);
+  // const sphere1 = new THREE.Mesh(sphere_geom, gridMaterial);
   sphere1.baseMaterial = sphere1.material;
   sphere1.position.set(0, capsule.length / 2 - capsule.radius, 0);
   sphere1.castShadow = true;
 
-  const sphere2 = new THREE.Mesh(sphere_geom, basicMaterial);
+  const sphere2 = new THREE.Mesh(sphere_geom, mat);
+  // const sphere2 = new THREE.Mesh(sphere_geom, gridMaterial);
   sphere2.baseMaterial = sphere2.material;
   sphere2.position.set(0, -capsule.length / 2 + capsule.radius, 0);
   sphere2.castShadow = true;
 
-  const cylinder = new THREE.Mesh(cylinder_geom, basicMaterial);
+  const cylinder = new THREE.Mesh(cylinder_geom, mat);
+  // const cylinder = new THREE.Mesh(cylinder_geom, gridMaterial);
   cylinder.baseMaterial = cylinder.material;
   cylinder.castShadow = true;
 
@@ -196,7 +213,7 @@ function createScene(system) {
       if ('box' in collider) {
         child = createBox(collider.box);
       } else if ('capsule' in collider) {
-        child = createCapsule(collider.capsule);
+        child = createCapsule(collider.capsule, body.name);
       } else if ('plane' in collider) {
         child = createPlane(collider.plane);
       } else if ('sphere' in collider) {

@@ -3,13 +3,15 @@
  * connect to a remote brax engine for interactive visualization.
  */
 
-import * as THREE from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/build/three.module.js';
-import {OrbitControls} from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/controls/OrbitControls.js';
-import {GUI} from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/libs/lil-gui.module.min.js';
+import * as THREE from 'https://threejs.org/build/three.module.js';
+import {OrbitControls} from 'https://threejs.org/examples/jsm/controls/OrbitControls.js';
+import {GUI} from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js';
 
 import {Animator} from './animator.js';
 import {Selector} from './selector.js';
 import {createScene, createTrajectory} from './system.js';
+
+console.log("viewer.js")
 
 function downloadDataUri(name, uri) {
   let link = document.createElement('a');
@@ -49,7 +51,7 @@ class Viewer {
     this.trajectory = createTrajectory(system);
 
     /* set up renderer, camera, and add default scene elements */
-    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
@@ -57,8 +59,8 @@ class Viewer {
     this.domElement.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
-    this.camera.position.set(5, 2, 8);
-    this.camera.follow = true;
+    this.camera.position.set(0, 5, 0);
+    this.camera.follow = false;
     this.camera.freezeAngle = false;
     this.camera.followDistance = 10;
 
@@ -78,10 +80,7 @@ class Viewer {
     dirLight.shadow.camera.right = 10;
     dirLight.shadow.camera.near = 0.1;
     dirLight.shadow.camera.far = 40;
-    dirLight.shadow.mapSize.width = 4096; // default is 512
-    dirLight.shadow.mapSize.height = 4096; // default is 512
     this.scene.add(dirLight);
-    this.dirLight = dirLight;
 
     /* set up orbit controls */
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -90,6 +89,7 @@ class Viewer {
     this.controls.addEventListener('start', () => {this.setDirty()});
     this.controls.addEventListener('change', () => {this.setDirty()});
     this.controlTargetPos = this.controls.target.clone();
+    // this.controls.enabled = false;
 
     /* set up gui */
     this.gui = new GUI({autoPlace: false});
@@ -106,11 +106,6 @@ class Viewer {
         .name('Follow Distance')
         .min(1)
         .max(50);
-    const santaHat = this.scene.getObjectByName('santa hat');
-    if (santaHat) {
-      santaHat.visible = false;
-      cameraFolder.add(santaHat, 'visible').name('Santa Hat');
-    }
 
     /* set up animator and load trajectory */
     this.animator = new Animator(this);
@@ -118,7 +113,7 @@ class Viewer {
 
     /* add body insepctors */
     const bodiesFolder = this.gui.addFolder('Bodies');
-    bodiesFolder.close();
+    bodiesFolder.open();
 
     this.bodyFolders = {};
 
@@ -126,7 +121,6 @@ class Viewer {
       if (!c.name) continue;
       const folder = bodiesFolder.addFolder(c.name);
       this.bodyFolders[c.name] = folder;
-      folder.close();
 
       function defaults() {
         for (const gui of arguments) {
@@ -223,10 +217,6 @@ class Viewer {
         this.setDirty();
       }
     }
-
-    // make sure target stays within shadow map region
-    this.dirLight.position.set(targetPos.x + 3, targetPos.y + 10, targetPos.z + 10);
-    this.dirLight.target = this.target;
 
     if (this.controls.update()) {
       this.setDirty();
