@@ -1,4 +1,4 @@
-# Copyright 2021 The Brax Authors.
+# Copyright 2022 The Brax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,11 +58,16 @@ _envs = {
 }
 
 
+def get_environment(env_name, **kwargs):
+  return _envs[env_name](**kwargs)
+
+
 def create(env_name: str,
            episode_length: int = 1000,
            action_repeat: int = 1,
            auto_reset: bool = True,
            batch_size: Optional[int] = None,
+           eval_metrics: bool = False,
            **kwargs) -> Env:
   """Creates an Env with a specified brax system."""
   env = _envs[env_name](**kwargs)
@@ -72,6 +77,8 @@ def create(env_name: str,
     env = wrappers.VectorWrapper(env, batch_size)
   if auto_reset:
     env = wrappers.AutoResetWrapper(env)
+  if eval_metrics:
+    env = wrappers.EvalWrapper(env)
 
   return env  # type: ignore
 

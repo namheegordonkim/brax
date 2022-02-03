@@ -1,4 +1,4 @@
-# Copyright 2021 The Brax Authors.
+# Copyright 2022 The Brax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,15 +59,9 @@ class InvertedPendulum(env.Env):
     # some pre-processing to pull joint angles and velocities
     (joint_angle,), (joint_vel,) = self.sys.joints[0].angle_vel(qp)
 
-    # qpos:
-    qpos = [qp.pos[0, 2:], qp.rot[0], joint_angle]
-
-    # qvel:
-    # velocity of the cart
-    # joint angle velocities
-    qvel = [qp.vel[0], joint_vel]
-
-    return jp.concatenate(qpos + qvel)
+    # [cart pos, angle, cart vel, angle vel]
+    obs = jp.concatenate([qp.pos[0, :1], joint_angle, qp.vel[0, :1], joint_vel])
+    return obs
 
 
 _SYSTEM_CONFIG = """
