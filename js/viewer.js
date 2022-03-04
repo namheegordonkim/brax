@@ -3,13 +3,14 @@
  * connect to a remote brax engine for interactive visualization.
  */
 
-import * as THREE from 'https://threejs.org/build/three.module.js';
-import {OrbitControls} from 'https://threejs.org/examples/jsm/controls/OrbitControls.js';
-import {GUI} from 'https://threejs.org/examples/jsm/libs/lil-gui.module.min.js';
+import * as THREE from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/build/three.module.js';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/controls/OrbitControls.js';
+import {GUI} from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/libs/lil-gui.module.min.js';
 
 import {Animator} from './animator.js';
 import {Selector} from './selector.js';
 import {createScene, createTrajectory} from './system.js';
+import { CSS2DRenderer, CSS2DObject } from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/renderers/CSS2DRenderer.js';
 
 console.log("viewer.js")
 
@@ -58,6 +59,13 @@ class Viewer {
 
     this.domElement.appendChild(this.renderer.domElement);
 
+    // to enable label debug rendering
+    this.labelRenderer = new CSS2DRenderer();
+    this.labelRenderer.setSize( window.innerWidth, window.innerHeight );
+    this.labelRenderer.domElement.style.position = 'absolute';
+    this.labelRenderer.domElement.style.top = '0px';
+    this.domElement.appendChild(this.labelRenderer.domElement);
+
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
     this.camera.position.set(0, 5, 0);
     this.camera.follow = false;
@@ -83,7 +91,7 @@ class Viewer {
     this.scene.add(dirLight);
 
     /* set up orbit controls */
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls = new OrbitControls(this.camera, this.labelRenderer.domElement);
     this.controls.enablePan = false;
     this.controls.enableDamping = true;
     this.controls.addEventListener('start', () => {this.setDirty()});
@@ -186,11 +194,14 @@ class Viewer {
     }
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.labelRenderer.setSize(w, h);
     this.setDirty();
   }
 
   render() {
     this.renderer.render(this.scene, this.camera);
+    this.labelRenderer.render(this.scene, this.camera);
+
     this.needsRender = false;
   }
 

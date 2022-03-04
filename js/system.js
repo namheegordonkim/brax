@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/build/three.module.js';
 import 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/geometries/ParametricGeometry.js';
-
+import { CSS2DRenderer, CSS2DObject } from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/renderers/CSS2DRenderer.js';
 
 const basicMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00, wireframe: true});
 const goalMaterial = new THREE.MeshPhongMaterial({color: 0xff2222, wireframe: true});
@@ -193,6 +193,14 @@ function createScene(system) {
       }
       parent.add(child);
     });
+    const labelDiv = document.createElement( 'div' );
+    labelDiv.className = 'label';
+    labelDiv.textContent = parent.name;
+    labelDiv.style.marginTop = '-1em';
+    const bodyLabel = new CSS2DObject(labelDiv);
+    bodyLabel.position.set(0, 0, 0);
+    // parent.add(bodyLabel);
+
     scene.add(parent);
   });
 
