@@ -19,6 +19,7 @@ import functools
 from typing import Callable, Optional, Union, overload
 
 import brax
+from brax.envs import acrobot
 from brax.envs import ant
 from brax.envs import fast
 from brax.envs import fetch
@@ -40,6 +41,7 @@ import gym
 
 
 _envs = {
+    'acrobot': acrobot.Acrobot,
     'ant': ant.Ant,
     'fast': fast.Fast,
     'fetch': fetch.Fetch,

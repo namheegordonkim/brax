@@ -52,7 +52,7 @@ class Viewer {
     this.trajectory = createTrajectory(system);
 
     /* set up renderer, camera, and add default scene elements */
-    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
+    this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
@@ -67,6 +67,13 @@ class Viewer {
     this.domElement.appendChild(this.labelRenderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100);
+    if (system.config.frozen.position.z) {
+      this.camera.position.set(0, 1, 0);
+    } else if (system.config.frozen.position.y) {
+      this.camera.position.set(0, 1, 2);
+    } else {
+      this.camera.position.set(5, 2, 8);
+    }
     this.camera.position.set(0, 5, 0);
     this.camera.follow = false;
     this.camera.freezeAngle = false;
@@ -88,14 +95,17 @@ class Viewer {
     dirLight.shadow.camera.right = 10;
     dirLight.shadow.camera.near = 0.1;
     dirLight.shadow.camera.far = 40;
+    dirLight.shadow.mapSize.width = 4096; // default is 512
+    dirLight.shadow.mapSize.height = 4096; // default is 512
     this.scene.add(dirLight);
+    this.dirLight = dirLight;
 
     /* set up orbit controls */
     this.controls = new OrbitControls(this.camera, this.labelRenderer.domElement);
     this.controls.enablePan = false;
     this.controls.enableDamping = true;
-    this.controls.addEventListener('start', () => {this.setDirty()});
-    this.controls.addEventListener('change', () => {this.setDirty()});
+    this.controls.addEventListener('start', () => {this.setDirty();});
+    this.controls.addEventListener('change', () => {this.setDirty();});
     this.controlTargetPos = this.controls.target.clone();
     // this.controls.enabled = false;
 
@@ -121,7 +131,7 @@ class Viewer {
 
     /* add body insepctors */
     const bodiesFolder = this.gui.addFolder('Bodies');
-    bodiesFolder.open();
+    bodiesFolder.close();
 
     this.bodyFolders = {};
 
@@ -129,6 +139,7 @@ class Viewer {
       if (!c.name) continue;
       const folder = bodiesFolder.addFolder(c.name);
       this.bodyFolders[c.name] = folder;
+      folder.close();
 
       function defaults() {
         for (const gui of arguments) {
@@ -171,6 +182,9 @@ class Viewer {
     window.addEventListener('resize', (evt) => this.setSize(), false);
     requestAnimationFrame(() => this.setSize());
 
+    const resizeObserver = new ResizeObserver(() => this.resizeCanvasToDisplaySize());
+    resizeObserver.observe(this.domElement, {box: 'content-box'});
+
     /* start animation */
     this.animate();
   }
@@ -196,6 +210,13 @@ class Viewer {
     this.renderer.setSize(w, h);
     this.labelRenderer.setSize(w, h);
     this.setDirty();
+  }
+
+  resizeCanvasToDisplaySize() {
+    //look up canvas size
+    const width = this.domElement.clientWidth;
+    const height = this.domElement.clientHeight;
+    this.setSize(width, height);
   }
 
   render() {
@@ -228,6 +249,10 @@ class Viewer {
         this.setDirty();
       }
     }
+
+    // make sure target stays within shadow map region
+    this.dirLight.position.set(targetPos.x + 3, targetPos.y + 10, targetPos.z + 10);
+    this.dirLight.target = this.target;
 
     if (this.controls.update()) {
       this.setDirty();
