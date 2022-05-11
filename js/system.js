@@ -1,42 +1,45 @@
 import * as THREE from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/build/three.module.js';
-import 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/geometries/ParametricGeometry.js';
-import { CSS2DRenderer, CSS2DObject } from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/renderers/CSS2DRenderer.js';
+import {ParametricGeometry} from 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r135/examples/jsm/geometries/ParametricGeometry.js';
 
-const basicMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00, wireframe: true});
-const goalMaterial = new THREE.MeshPhongMaterial({color: 0xff2222, wireframe: true});
-const targetMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00, wireframe: true});
-const cueMaterial = new THREE.MeshPhongMaterial({color: 0x665544, wireframe: true});
-const gridTexture = new THREE.TextureLoader().load("/brax/js/assets/grid.png");
-const gridMaterial = new THREE.MeshLambertMaterial({ map: gridTexture, color: 0xe0e0e0 })
+function createCheckerBoard() {
+    const width = 2;
+    const height = 2;
 
-function createCapsule(capsule, name) {
-  console.log("createCapsule invoked")
-  console.log("gridMaterial")
-  console.log(capsule)
+    const size = width * height;
+    const data = new Uint8Array( 3 * size );
+    const colors = [new THREE.Color( 0x999999 ), new THREE.Color( 0x888888 )];
 
+    for ( let i = 0; i < size; i ++ ) {
+      const stride = i * 3;
+      const ck = [0, 1, 1, 0];
+      const color = colors[ck[i]];
+      data[ stride + 0] = Math.floor( color.r * 255 );
+      data[ stride + 1] = Math.floor( color.g * 255 );
+      data[ stride + 2] = Math.floor( color.b * 255 );
+    }
+    const texture = new THREE.DataTexture( data, width, height, THREE.RGBFormat );
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set( 1000, 1000 );
+    return new THREE.MeshStandardMaterial( { map: texture } );
+}
+
+function createCapsule(capsule, mat) {
   const sphere_geom = new THREE.SphereGeometry(capsule.radius, 16, 16);
   const cylinder_geom = new THREE.CylinderGeometry(
       capsule.radius, capsule.radius, capsule.length - 2 * capsule.radius);
 
-  let mat = name.includes('Goal') ?
-      goalMaterial :
-      name.includes('Cue') ?
-          cueMaterial :
-          basicMaterial;
   const sphere1 = new THREE.Mesh(sphere_geom, mat);
-  // const sphere1 = new THREE.Mesh(sphere_geom, gridMaterial);
   sphere1.baseMaterial = sphere1.material;
   sphere1.position.set(0, capsule.length / 2 - capsule.radius, 0);
   sphere1.castShadow = true;
 
   const sphere2 = new THREE.Mesh(sphere_geom, mat);
-  // const sphere2 = new THREE.Mesh(sphere_geom, gridMaterial);
   sphere2.baseMaterial = sphere2.material;
   sphere2.position.set(0, -capsule.length / 2 + capsule.radius, 0);
   sphere2.castShadow = true;
 
   const cylinder = new THREE.Mesh(cylinder_geom, mat);
-  // const cylinder = new THREE.Mesh(cylinder_geom, gridMaterial);
   cylinder.baseMaterial = cylinder.material;
   cylinder.castShadow = true;
 
@@ -45,41 +48,18 @@ function createCapsule(capsule, name) {
   return group;
 }
 
-function createBox(box) {
+function createBox(box, mat) {
   const geom = new THREE.BoxBufferGeometry(
       2 * box.halfsize.x, 2 * box.halfsize.z, 2 * box.halfsize.y);
-  const mesh = new THREE.Mesh(geom, basicMaterial);
+  const mesh = new THREE.Mesh(geom, mat);
   mesh.castShadow = true;
   mesh.baseMaterial = mesh.material;
   return mesh;
 }
 
-function createPlane(plane) {
-  // make a checkerboard material
-  const width = 2;
-  const height = 2;
-
-  const size = width * height;
-  const data = new Uint8Array( 3 * size );
-  const colors = [new THREE.Color( 0x999999 ), new THREE.Color( 0x888888 )];
-
-  for ( let i = 0; i < size; i ++ ) {
-    const stride = i * 3;
-    const ck = [0, 1, 1, 0];
-    const color = colors[ck[i]];
-    data[ stride + 0] = Math.floor( color.r * 255 );
-    data[ stride + 1] = Math.floor( color.g * 255 );
-    data[ stride + 2] = Math.floor( color.b * 255 );
-  }
-  const texture = new THREE.DataTexture( data, width, height, THREE.RGBFormat );
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set( 1000, 1000 );
-  const material = new THREE.MeshStandardMaterial( { map: texture } );
-
-  // mesh
+function createPlane(plane, mat) {
   const geometry = new THREE.PlaneGeometry( 2000, 2000);
-  const mesh = new THREE.Mesh( geometry, material );
+  const mesh = new THREE.Mesh(geometry, mat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.receiveShadow = true;
   mesh.baseMaterial = mesh.material;
@@ -87,16 +67,15 @@ function createPlane(plane) {
   return mesh;
 }
 
-function createSphere(sphere, name) {
+function createSphere(sphere, mat) {
   const geom = new THREE.SphereGeometry(sphere.radius, 16, 16);
-  let mat = name.toLowerCase() == 'target' ? targetMaterial : basicMaterial;
   const mesh = new THREE.Mesh(geom, mat);
   mesh.castShadow = true;
   mesh.baseMaterial = mesh.material;
   return mesh;
 }
 
-function createHeightMap(heightMap) {
+function createHeightMap(heightMap, mat) {
   const size = heightMap.size;
   const n_subdiv = Math.sqrt(heightMap.data.length) - 1;
 
@@ -116,38 +95,33 @@ function createHeightMap(heightMap) {
   geom.normalizeNormals();
 
   const group = new THREE.Group();
-  const mesh = new THREE.Mesh(
-      geom,
-      new THREE.MeshStandardMaterial({color: 0x796049, flatShading: true}));
+  const mesh = new THREE.Mesh(geom, mat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.receiveShadow = true;
   group.add(mesh);
   return group;
 }
 
-function createMesh(mesh, geom) {
+function createMesh(mesh_config, geom, mat) {
   const bufferGeometry = new THREE.BufferGeometry();
   const vertices = geom.vertices;
   const positions = new Float32Array(vertices.length * 3);
-  const scale = mesh.scale ? mesh.scale : 1;
+  const scale = mesh_config.scale ? mesh_config.scale : 1;
   // Convert the coordinate system.
   vertices.forEach(function(vertice, i) {
       positions[i * 3] = vertice.x * scale;
       positions[i * 3 + 1] = vertice.z * scale;
-      positions[i * 3 + 2] = vertice.y * scale;
+      positions[i * 3 + 2] = -vertice.y * scale;
   });
   const indices = new Uint16Array(geom.faces);
-  for (let i = 1; i < indices.length; i += 3) {
-      [indices[i + 1], indices[i]] = [indices[i], indices[i + 1]];
-  }
   bufferGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   bufferGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
   bufferGeometry.computeVertexNormals();
 
-  const mesh3 = new THREE.Mesh(bufferGeometry, basicMaterial);
-  mesh3.castShadow = true;
-  mesh3.baseMaterial = mesh.material;
-  return mesh3;
+  const mesh = new THREE.Mesh(bufferGeometry, mat);
+  mesh.castShadow = true;
+  mesh.baseMaterial = mesh.material;
+  return mesh;
 }
 
 function createScene(system) {
@@ -160,19 +134,27 @@ function createScene(system) {
     const parent = new THREE.Group();
     parent.name = body.name.replaceAll('/', '_');  // sanitize node name
     body.colliders.forEach(function(collider) {
+      const color = collider.color
+        ? collider.color
+        : body.name.toLowerCase() == 'target' ? '#ff2222' : '#665544';
+      const mat = ('plane' in collider)
+        ? createCheckerBoard()
+        : ('heightMap' in collider)
+          ? new THREE.MeshStandardMaterial({color: color, flatShading: true})
+          : new THREE.MeshPhongMaterial({color: color});
       let child;
       if ('box' in collider) {
-        child = createBox(collider.box);
+        child = createBox(collider.box, mat);
       } else if ('capsule' in collider) {
-        child = createCapsule(collider.capsule, body.name);
+        child = createCapsule(collider.capsule, mat);
       } else if ('plane' in collider) {
-        child = createPlane(collider.plane);
+        child = createPlane(collider.plane, mat);
       } else if ('sphere' in collider) {
-        child = createSphere(collider.sphere, body.name);
+        child = createSphere(collider.sphere, mat);
       } else if ('heightMap' in collider) {
-        child = createHeightMap(collider.heightMap);
+        child = createHeightMap(collider.heightMap, mat);
       } else if ('mesh' in collider) {
-        child = createMesh(collider.mesh, meshGeoms[collider.mesh.name]);
+        child = createMesh(collider.mesh, meshGeoms[collider.mesh.name], mat);
       }
       if (collider.rotation) {
         // convert from z-up to y-up coordinate system
@@ -182,25 +164,17 @@ function createScene(system) {
         const eul = new THREE.Euler();
         eul.setFromVector3(rot);
         child.quaternion.setFromEuler(eul);
-        child.quaternion.x = -child.quaternion.x;
         const tmp = child.quaternion.y;
-        child.quaternion.y = -child.quaternion.z;
+        child.quaternion.y = child.quaternion.z;
         child.quaternion.z = -tmp;
       }
       if (collider.position) {
         child.position.set(
-            collider.position.x, collider.position.z, collider.position.y);
+            collider.position.x, collider.position.z, -collider.position.y);
       }
+      child.visible = !collider.hidden;
       parent.add(child);
     });
-    const labelDiv = document.createElement( 'div' );
-    labelDiv.className = 'label';
-    labelDiv.textContent = parent.name;
-    labelDiv.style.marginTop = '-1em';
-    const bodyLabel = new CSS2DObject(labelDiv);
-    bodyLabel.position.set(0, 0, 0);
-    // parent.add(bodyLabel);
-
     scene.add(parent);
   });
 
@@ -214,9 +188,9 @@ function createTrajectory(system) {
 
   system.config.bodies.forEach(function(body, bi) {
     const group = body.name.replaceAll('/', '_');  // sanitize node name
-    const pos = system.pos.map(p => [p[bi][0], p[bi][2], p[bi][1]]);
+    const pos = system.pos.map(p => [p[bi][0], p[bi][2], -p[bi][1]]);
     const rot =
-        system.rot.map(r => [-r[bi][1], -r[bi][3], -r[bi][2], r[bi][0]]);
+        system.rot.map(r => [r[bi][1], r[bi][3], -r[bi][2], r[bi][0]]);
     tracks.push(new THREE.VectorKeyframeTrack(
         'scene/' + group + '.position', times, pos.flat()));
     tracks.push(new THREE.QuaternionKeyframeTrack(

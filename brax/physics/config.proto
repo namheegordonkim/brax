@@ -91,6 +91,12 @@ message Collider {
     HeightMap heightMap = 7;
     Mesh mesh = 9;
   }
+  // Color of the collider in css notation (e.g. '#ff0000' or 'red')
+  string color = 10;
+  // A hidden collider is not visualized
+  bool hidden = 11;
+  // A no-contact collider doesn't yield any collisions
+  bool no_contact = 12;
 }
 
 // Joints connect two bodies and restrain their movement to a rotational frame.
@@ -103,6 +109,7 @@ message Joint {
   // Unique name for this joint
   string name = 1;
   // Spring constant controlling the strength of this joint
+  // If not set, defaults to infinite strength.
   float stiffness = 2;
   // Parent body's name
   string parent = 3;
@@ -122,10 +129,14 @@ message Joint {
   // and two for x,y.
   repeated Range angle_limit = 9;
   // Strength of the force that restores joint to within the angle limits
-  // If not set, defaults to a joint-dependent fraction of `stiffness`.
+  // If stiffness is not set, this field is ignored.
+  // If stiffness is non-zero, and this field is not set, defaults to a
+  // joint-dependent fraction of `stiffness`.
   optional float limit_strength = 10;
   // Damps the spring connecting the parent to the child
-  // If not set, defaults to a joint-dependent fraction of `sqrt(stiffness)`.
+  // If stiffness is not set, this field is ignored.
+  // If stiffness is non-zero, and this field is not set, defaults to a
+  // joint-dependent fraction of `sqrt(stiffness)`.
   optional float spring_damping = 11;
   // The initial rotation between the parent and child, defined in terms of
   // an intrinsic euler rotation about parent's local axes.  This sets the
@@ -167,9 +178,12 @@ message Force {
   float strength = 3;
   // Applies a force to the center of the body in the specified direction
   message Thruster {}
+  // Applies a torque to the center of the body around a specified axis
+  message Twister {}
   // A force may only be one type
   oneof type {
     Thruster thruster = 4;
+    Twister twister = 5;
   }
 }
 
@@ -232,7 +246,7 @@ message MeshGeometry {
 }
 
 // The configuration of a system for Brax to simulate
-// Next ID: 18
+// Next ID: 22
 message Config {
   message NamePair {
     string first = 1;
@@ -272,4 +286,13 @@ message Config {
   int32 collider_cutoff = 15;
   // All of the mesh geometries in the system.
   repeated MeshGeometry mesh_geometries = 17;
+  // The physics used for this config.  Options: ['pbd', 'legacy_spring']
+  // Defaults to 'pbd'
+  string dynamics_mode = 18;
+  // Sets the default magnitude of position based updates for position data
+  optional float solver_scale_pos = 19;
+  // Sets the default magnitude of position based updates for angular data
+  optional float solver_scale_ang = 20;
+  // Sets the default magnitude of position based updates for collision data
+  optional float solver_scale_collide = 21;
 }

@@ -14,8 +14,10 @@
 
 """Core brax structs and some conversion and slicing functions."""
 
+import copy
 import os
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Union
+import warnings
 
 from brax import jumpy as jp
 from brax import math
@@ -44,7 +46,7 @@ class Q(object):
     elif isinstance(o, QP):
       return QP(self.pos + o.pos, self.rot + o.rot, o.vel, o.ang)
     else:
-      raise ValueError("add only supported for P, Q, QP")
+      raise ValueError('add only supported for P, Q, QP')
 
 
 @struct.dataclass
@@ -66,7 +68,7 @@ class P(object):
     elif isinstance(o, QP):
       return QP(o.pos, o.rot, self.vel + o.vel, self.ang + o.ang)
     else:
-      raise ValueError("add only supported for P, Q, QP")
+      raise ValueError('add only supported for P, Q, QP')
 
   def __mul__(self, o):
     return P(self.vel * o, self.ang * o)
@@ -96,7 +98,7 @@ class QP(object):
       return QP(self.pos + o.pos, self.rot + o.rot, self.vel + o.vel,
                 self.ang + o.ang)
     else:
-      raise ValueError("add only supported for P, Q, QP")
+      raise ValueError('add only supported for P, Q, QP')
 
   def __mul__(self, o):
     return QP(self.pos * o, self.rot * o, self.vel * o, self.ang * o)
@@ -143,7 +145,7 @@ class Info(object):
     actuator: Actuator forces applied at a step
   """
   contact: P
-  joint: P
+  joint: Union[P, Q]
   actuator: P
 
 
@@ -151,8 +153,10 @@ def validate_config(
     config: config_pb2.Config,
     resource_paths: Optional[Sequence[str]] = None) -> config_pb2.Config:
   """Validate and normalize config settings for use in systems."""
+  config = copy.deepcopy(config)
+
   if config.dt <= 0:
-    raise RuntimeError("config.dt must be positive")
+    raise ValueError('config.dt must be positive')
 
   if config.substeps == 0:
     config.substeps = 1
@@ -161,7 +165,7 @@ def validate_config(
     names = set()
     for obj in objs:
       if obj.name in names:
-        raise RuntimeError(f"duplicate name in config: {obj.name}")
+        raise RuntimeError(f'duplicate name in config: {obj.name}')
       names.add(obj.name)
 
   find_dupes(config.bodies)
@@ -169,9 +173,30 @@ def validate_config(
   find_dupes(config.actuators)
   find_dupes(config.mesh_geometries)
 
+  if config.dynamics_mode == 'legacy_spring':
+    if any(j.stiffness == 0 for j in config.joints):
+      raise ValueError(
+          'joint.stiffness must be >0 when dynamics_mode == legacy_spring')
+  elif config.dynamics_mode == 'pbd':
+    if any(j.stiffness != 0 for j in config.joints):
+      raise ValueError('joint.stiffness is invalid when dynamics_mode == pbd')
+    if config.baumgarte_erp:
+      raise ValueError('baumgarte_erp is invalid when dynamics_mode == pbd')
+  elif any(j.stiffness != 0 for j in config.joints):
+    config.dynamics_mode = 'legacy_spring'
+    warnings.warn('dynamics_mode not specified, but joint.stiffness >0. '
+                  'Setting dynamics_mode="legacy_spring".')
+  else:
+    config.dynamics_mode = 'pbd'
+    warnings.warn(
+        'dynamics_mode either not specified or not recognized, defaulting to '
+        '"pbd".  If you wish to preserve legacy behavior used in previous '
+        'versions of Brax, set dynamics_mode="legacy_spring".'
+    )
+
   # Load the meshes.
   if resource_paths is None:
-    resource_paths = [""]
+    resource_paths = ['']
   for mesh_geom in config.mesh_geometries:
     if mesh_geom.path:
       # Clear the vertices and faces, if any.
@@ -182,7 +207,7 @@ def validate_config(
         path = os.path.join(resource_path, mesh_geom.path)
         if not file.Exists(path):
           continue
-        with file.File(path, "rb") as f:
+        with file.File(path, 'rb') as f:
           trimesh = load_mesh(f, file_type=str(mesh_geom.path))
           for v in trimesh.vertices:
             mesh_geom.vertices.add(x=v[0], y=v[1], z=v[2])
@@ -193,8 +218,8 @@ def validate_config(
             mesh_geom.face_normals.add(x=v[0], y=v[1], z=v[2])
         found = True
         break
-      assert found, f"{mesh_geom.path} is missing."
-      mesh_geom.ClearField("path")  # Clear the path.
+      assert found, f'{mesh_geom.path} is missing.'
+      mesh_geom.ClearField('path')  # Clear the path.
 
   # TODO: more config validation
 
@@ -231,7 +256,7 @@ def validate_config(
 
     # insert material properties to colliders
     for c in b.colliders:
-      if not c.HasField("material"):
+      if not c.HasField('material'):
         c.material.friction = config.friction
         c.material.elasticity = config.elasticity
 

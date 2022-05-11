@@ -51,11 +51,12 @@ class BodyTest(absltest.TestCase):
 class BoxTest(absltest.TestCase):
 
   _CONFIG = """
-    dt: 1.5 substeps: 1000 friction: 0.77459666924 baumgarte_erp: 0.1
+    dt: 1.5 substeps: 2000 friction: 0.77459666924
     gravity { z: -9.8 }
     bodies {
       name: "box" mass: 1
       colliders { box { halfsize { x: 0.5 y: 0.5 z: 0.5 }}}
+      colliders { box { halfsize { x: 1 y: 1 z: 1 }} no_contact: true }
       inertia { x: 1 y: 1 z: 1 }
     }
     bodies { name: "Ground" frozen: { all: true } colliders { plane {}}}
@@ -84,43 +85,94 @@ class BoxTest(absltest.TestCase):
 class BoxCapsuleTest(absltest.TestCase):
 
   _CONFIG = """
-    dt: 0.05 substeps: 20 friction: 1 baumgarte_erp: 0.1
+    dt: 0.05 substeps: 30 friction: 1
     gravity { z: -9.8 }
     bodies {
-      name: "box" mass: 1
+      name: "box1" mass: 1
       colliders { box { halfsize { x: 0.5 y: 0.5 z: 0.5 }}}
       inertia { x: 1 y: 1 z: 1 }
     }
     bodies {
-      name: "capsule" mass: 1
+      name: "capsule1" mass: 1
       colliders { capsule { length: 2 radius: 0.2 } }
       inertia { x: 1 y: 1 z: 1 }
     }
-
+    bodies {
+      name: "box2" mass: 10
+      colliders { box { halfsize { x: 0.5 y: 0.5 z: 0.5 }}}
+      inertia { x: 1 y: 1 z: 1 }
+    }
+    bodies {
+      name: "capsule2" mass: 1
+      colliders { capsule { length: 2 radius: 0.2 } }
+      inertia { x: 1 y: 1 z: 1 }
+    }
+    bodies {
+      name: "box3"
+      colliders {
+        box {
+          halfsize: { x: 0.5 y: 0.5 z: 0.5 }
+        }
+      }
+      mass: 1.0
+      frozen { all: true }
+    }
+    bodies {
+      name: "capsule3"
+      colliders {
+        capsule { radius: 0.5 length: 1.0 }
+      }
+      inertia { x: 1.0 y: 1.0 z: 1.0 }
+      mass: 1.0
+    }
     bodies { name: "Ground" frozen: { all: true } colliders { plane {}}}
     defaults {
-      qps { name: "box" pos { z: 2 }}
-      qps { name: "capsule" pos: { z: 0.2 } rot: { y: 90 } }
+      qps {
+        name: "capsule1"
+        pos { x: 8 y: 0 z: 1 }
+      }
+      qps {
+        name: "box1"
+        pos { x: 8 y: 0 z: 3.5 }
+      }
+      qps {
+        name: "capsule2"
+        pos { x: 2 y: 0 z: 1 }
+      }
+      qps {
+        name: "box2"
+        pos { x: 2 y: 0 z: 3.5 }
+      }
+      qps { name: "capsule3" pos { x: 0 y: 0 z: 3 } }
     }
+    solver_scale_collide: .3
   """
 
   def test_box_hits_capsule(self):
     """A box falls onto a capsule and stays above it."""
     sys = brax.System(text_format.Parse(BoxCapsuleTest._CONFIG, brax.Config()))
     qp = sys.default_qp()
-    self.assertAlmostEqual(qp.pos[0, 2], 2, 2)
+    self.assertAlmostEqual(qp.pos[0, 2], 3.5, 2)
+    self.assertAlmostEqual(qp.pos[2, 2], 3.5, 2)
 
     step = jax.jit(sys.step)
     for _ in range(50):
       qp, _ = step(qp, jp.array([]))
-    # Box should be on the capsule, rather than on the ground.
-    self.assertAlmostEqual(qp.pos[0, 2], 0.9, 2)
+    # Box should be on the capsule, rather than on the ground, for both masses
+    # box falls on capsule
+    self.assertAlmostEqual(qp.pos[0, 2], 2.5, 2)
+    self.assertAlmostEqual(qp.pos[1, 2], 1.0, 2)
+    # box falls on capsule with non-unit mass ratio
+    self.assertAlmostEqual(qp.pos[2, 2], 2.5, 2)
+    self.assertAlmostEqual(qp.pos[3, 2], 1.0, 2)
+    # capsule falls on frozen box
+    self.assertAlmostEqual(qp.pos[5, 2], 1.5, 2)
 
 
 class HeightMapTest(absltest.TestCase):
 
   _CONFIG = """
-    dt: 2 substeps: 1000 friction: 1 baumgarte_erp: 0.1 elasticity: 0
+    dt: 2 substeps: 1000 friction: 1 elasticity: 0
     gravity { z: -9.8 }
     bodies {
       name: "box" mass: 1
@@ -151,7 +203,7 @@ class HeightMapTest(absltest.TestCase):
 class SphereTest(absltest.TestCase):
 
   _CONFIG = """
-    dt: 5 substeps: 50 friction: 0.6 baumgarte_erp: 0.1
+    dt: 5 substeps: 500 friction: 0.6
     gravity { z: -9.8 }
     bodies {
       name: "Sphere1" mass: 1
@@ -181,7 +233,7 @@ class SphereTest(absltest.TestCase):
 class CapsuleTest(absltest.TestCase):
 
   _CONFIG = """
-    dt: 20.0 substeps: 10000 friction: 0.6 baumgarte_erp: 0.1
+    dt: 20.0 substeps: 10000 friction: 0.6
     gravity { z: -9.8 }
     bodies {
       name: "Capsule1" mass: 1
@@ -230,7 +282,10 @@ class CapsuleTest(absltest.TestCase):
 
   def test_capsule_hits_capsule(self):
     """A capsule falls onto another capsule and balances on it."""
-    sys = brax.System(text_format.Parse(CapsuleTest._CONFIG, brax.Config()))
+    config = text_format.Parse(CapsuleTest._CONFIG, brax.Config())
+    config.dt = 2.0
+    config.substeps = 400
+    sys = brax.System(config, brax.Config())
     qp = sys.default_qp(1)
     qp, _ = jax.jit(sys.step)(qp, jp.array([]))
     self.assertAlmostEqual(qp.pos[0, 2], 0.5, 2)  # standing up and down
@@ -240,6 +295,8 @@ class CapsuleTest(absltest.TestCase):
     """A capsule falls onto another capsule, with NN culling."""
     config = text_format.Parse(CapsuleTest._CONFIG, brax.Config())
     config.collider_cutoff = 1
+    config.dt = 2.0
+    config.substeps = 400
     sys = brax.System(config)
     qp = sys.default_qp(1)
     qp, _ = jax.jit(sys.step)(qp, jp.array([]))
@@ -250,7 +307,7 @@ class CapsuleTest(absltest.TestCase):
 class MeshTest(absltest.TestCase):
 
   _CONFIG = """
-    dt: 0.05 substeps: 10 friction: 1.0 baumgarte_erp: 0.1
+    dt: 0.05 substeps: 10 friction: 1.0
     gravity { z: -9.8 }
     bodies {
       name: "Mesh" mass: 1
@@ -306,13 +363,13 @@ class MeshTest(absltest.TestCase):
     for _ in range(30):
       qp, _ = step(qp, jp.array([]))
     # Cylinder should be on the capsule, rather than on the ground.
-    self.assertAlmostEqual(qp.pos[0, 2], 0.38, 2)
+    self.assertAlmostEqual(qp.pos[0, 2], 0.394, 2)
 
 
 class JointTest(parameterized.TestCase):
 
   _CONFIG = """
-    substeps: 100000
+    substeps: 4000
     dt: .01
     gravity { z: -9.8 }
     bodies {
@@ -321,10 +378,11 @@ class JointTest(parameterized.TestCase):
     }
     bodies { name: "Bob" mass: 1 inertia { x: 1 y: 1 z: 1 }}
     joints {
-      name: "Joint" parent: "Anchor" child: "Bob" stiffness: 10000
+      name: "Joint" parent: "Anchor" child: "Bob"
       child_offset { z: 1 }
       angle_limit { min: -180 max: 180 }
     }
+    solver_scale_pos: .2
   """
 
   @parameterized.parameters((2.0, 0.125, 0.0625), (5.0, 0.125, 0.03125),
@@ -409,9 +467,10 @@ class JointTest(parameterized.TestCase):
       _, angle_default = joint_default.axis_angle(qp_p, qp_c)
       angle_offset = (jp.array(angle_offset) / jp.pi) * 180
       angle_default = (jp.array(angle_default) / jp.pi) * 180
-      num_offsets = angle_offset.shape[0]
+      num_offsets = l + 1
 
-      for a_o, a_d, t_o in zip(angle_offset, angle_default,
+      for a_o, a_d, t_o in zip(angle_offset[:num_offsets],
+                               angle_default[:num_offsets],
                                this_offset[:num_offsets]):
         if limit == 0:
           # default system sees part rotated by offset degrees
@@ -433,14 +492,13 @@ class Actuator1DTest(parameterized.TestCase):
   _CONFIG = """
     substeps: 80
     dt: 4.0
-    gravity { z: -9.8 }
     bodies {
       name: "Anchor" frozen: { all: true } mass: 1
       inertia { x: 1 y: 1 z: 1 }
     }
     bodies { name: "Bob" mass: 1 inertia { x: 1 y: 1 z: 1 }}
     joints {
-      name: "Joint" parent: "Anchor" child: "Bob" stiffness: 5000
+      name: "Joint" parent: "Anchor" child: "Bob"
       child_offset { z: 1 }
       angle_limit { min: -180 max: 180 }
       angular_damping: 20.0
@@ -474,7 +532,6 @@ class Actuator2DTest(parameterized.TestCase):
   _CONFIG = """
     substeps: 2000
     dt: 2.0
-    gravity { z: -9.8 }
     bodies {
       name: "Anchor" frozen: { all: true } mass: 1
       inertia { x: 1 y: 1 z: 1 }
@@ -483,16 +540,16 @@ class Actuator2DTest(parameterized.TestCase):
       name: "Bob" mass: 1 inertia { x: 1 y: 1 z: 1 }
     }
     joints {
-      name: "Joint" parent: "Anchor" child: "Bob" stiffness: 10000
+      name: "Joint" parent: "Anchor" child: "Bob"
       child_offset { z: 1 }
       angle_limit { min: -180 max: 180 }
       angle_limit { min: -180 max: 180 }
-      angular_damping: 200.0
+      angular_damping: 20.0
     }
     actuators {
       name: "Joint"
       joint: "Joint"
-      strength: 2000.0
+      strength: 200.0
       angle {}
     }
     defaults { qps { name: "Anchor" pos {z: 2}} qps { name: "Bob" pos {z: 1}}}
@@ -527,7 +584,7 @@ class Actuator3DTest(parameterized.TestCase):
       colliders { capsule { radius: 0.5 length: 2.0 } }
     }
     joints {
-      name: "Joint" parent: "Anchor" child: "Bob" stiffness: 10000
+      name: "Joint" parent: "Anchor" child: "Bob"
       child_offset { z: 1 }
       angle_limit {
         min: -100
@@ -542,7 +599,6 @@ class Actuator3DTest(parameterized.TestCase):
         max: 100
       }
       angular_damping: 180.0
-      limit_strength: 2000.0
     }
     actuators {
       name: "Joint"
@@ -575,6 +631,81 @@ class Actuator3DTest(parameterized.TestCase):
       for angle, limit, torque in zip(angles, limits, t):
         if torque != 0:
           self.assertAlmostEqual(angle, limit, 1)  # actuated to target angle
+
+
+class ForceTest(parameterized.TestCase):
+
+  _CONFIG = """
+    dt: 0.1
+    substeps: 5000
+    bodies { name: "body" mass: 1 inertia { x: 1 y: 1 z: 1 }}
+    forces {
+      name: "thruster"
+      body: "body"
+      strength: 2.5
+      thruster {}
+    }
+    forces {
+      name: "twister"
+      body: "body"
+      strength: 2.5
+      twister {}
+    }
+  """
+
+  @parameterized.parameters(1, 5, 10)
+  def test_thruster(self, force):
+    """A simple part actuates to a target angle."""
+    config = text_format.Parse(ForceTest._CONFIG, brax.Config())
+    sys = brax.System(config=config)
+    qp = sys.default_qp()
+    qp, _ = sys.step(qp, force * jp.array([1., 0., 0., 0., 0., 0]))
+
+    self.assertAlmostEqual(qp.pos[0][0], 0.5 * 2.5 * force * 0.1**2, 3)
+
+  @parameterized.parameters(1, 5, 10)
+  def test_twister(self, torque):
+    """A simple part actuates to a target angle."""
+    config = text_format.Parse(ForceTest._CONFIG, brax.Config())
+    sys = brax.System(config=config)
+    qp = sys.default_qp()
+    qp, _ = sys.step(qp, torque * jp.array([0., 0., 0., 1., 0., 0]))
+
+    self.assertAlmostEqual(qp.ang[0][0], 2.5 * torque * 0.1, 3)
+
+
+class ElasticityTest(parameterized.TestCase):
+  _CONFIG = """
+  dt: 1. substeps: 1000 friction: 0.0 elasticity: 0.5
+  gravity { z: -9.8 }
+  bodies {
+    name: "sphere" mass: 1
+    colliders { capsule { radius: .5 length: 1.0 } }
+    inertia { x: 1 y: 1 z: 1 }
+    }
+  bodies {
+    name: "boxwall" mass: 1
+    colliders { box { halfsize { x: 1 y: 1 z: 1}}}
+    inertia { x: 1 y: 1 z: 1}
+    frozen { all: true}
+  }
+  bodies { name: "Ground" frozen: { all: true } colliders { plane {}}}
+  defaults { qps { name: "sphere" vel {x: 10}}
+             qps { name: "boxwall" pos { x: 10 } }}
+  """
+
+  @parameterized.parameters(0, .5, 1.)
+  def test_ball_bounce(self, elasticity):
+    """A ball bounces off a wall where ball and wall have some elasticity."""
+    config = text_format.Parse(ElasticityTest._CONFIG, brax.Config())
+    config.elasticity = elasticity
+    sys = brax.System(config=config)
+    qp = sys.default_qp()
+    qp_init = qp
+    qp, _ = sys.step(qp, jp.array([]))
+
+    self.assertAlmostEqual(qp_init.vel[0][0] * (-1) * (elasticity**2.),
+                           qp.vel[0][0], 2)
 
 
 if __name__ == '__main__':
