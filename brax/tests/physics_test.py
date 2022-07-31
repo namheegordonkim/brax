@@ -26,6 +26,8 @@ import jax
 
 from google.protobuf import text_format
 
+from brax.io.html import save_html
+
 
 class BodyTest(absltest.TestCase):
 
@@ -156,8 +158,18 @@ class BoxCapsuleTest(absltest.TestCase):
     self.assertAlmostEqual(qp.pos[2, 2], 3.5, 2)
 
     step = jax.jit(sys.step)
+    qps = []
     for _ in range(50):
       qp, _ = step(qp, jp.array([]))
+      qps.append(qp)
+
+    # render the offline data
+    html_save_path = os.path.join(os.path.curdir, "viewer.html")
+    # save_html(html_save_path, env.sys, qps, args.js_dir)
+    save_html(html_save_path, sys, qps)
+    print(f"Saved viewer.html to {html_save_path}")
+
+
     # Box should be on the capsule, rather than on the ground, for both masses
     # box falls on capsule
     self.assertAlmostEqual(qp.pos[0, 2], 2.5, 2)
@@ -329,7 +341,7 @@ class MeshTest(absltest.TestCase):
     }
     mesh_geometries {
       name: "Cylinder"
-      path: "cylinder.stl"
+      path: "/home/nhgk/workspace/brax/brax/tests/testdata/cylinder.stl"
     }
   """
 
@@ -359,10 +371,19 @@ class MeshTest(absltest.TestCase):
     qp = sys.default_qp()
     self.assertAlmostEqual(qp.pos[0, 2], 1.5, 2)
 
+    qps = []
+
     step = jax.jit(sys.step)
-    for _ in range(30):
+    for _ in range(120):
       qp, _ = step(qp, jp.array([]))
+      qps.append(qp)
     # Cylinder should be on the capsule, rather than on the ground.
+    # render the offline data
+    html_save_path = os.path.join(os.path.curdir, "viewer.html")
+    # save_html(html_save_path, env.sys, qps, args.js_dir)
+    save_html(html_save_path, sys, qps)
+    print(f"Saved viewer.html to {html_save_path}")
+
     self.assertAlmostEqual(qp.pos[0, 2], 0.394, 2)
 
 

@@ -288,13 +288,13 @@ class Viewer {
 
   setHover(object, hovering) {
     this.setDirty();
-    if (!object.selected) {
-      object.traverse(function(child) {
-        if (child instanceof THREE.Mesh) {
-          child.material = hovering ? hoverMaterial : child.baseMaterial;
-        }
-      });
-    }
+    // if (!object.selected) {
+    //   object.traverse(function(child) {
+    //     if (child instanceof THREE.Mesh) {
+    //       child.material = hovering ? hoverMaterial : child.baseMaterial;
+    //     }
+    //   });
+    // }
     if (object.name in this.bodyFolders) {
       const titleElement =
           this.bodyFolders[object.name].domElement.querySelector('.title');

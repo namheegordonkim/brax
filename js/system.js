@@ -137,7 +137,7 @@ function createScene(system) {
       const color = collider.color
         ? collider.color
         : body.name.toLowerCase() == 'target' ? '#ff2222' : '#665544';
-      const mat = ('plane' in collider)
+      const mat = false
         ? createCheckerBoard()
         : ('heightMap' in collider)
           ? new THREE.MeshStandardMaterial({color: color, flatShading: true})
